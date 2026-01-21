@@ -6,9 +6,9 @@
     "TheHeimZocker"
   ],
   "description": "The only stove mod you will ever need",
-  "version": "1.21.6",
+  "version": "1.21.0",
   "side": "universal",
   "dependencies": {
-    "game": "1.21.6"
+    "game": "1.21.0"
   }
 }
