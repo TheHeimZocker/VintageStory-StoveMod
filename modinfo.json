@@ -9,6 +9,6 @@
   "version": "1.21.6",
   "side": "universal",
   "dependencies": {
-    "game": "1.21.*"
+    "game": "1.21.6"
   }
 }
