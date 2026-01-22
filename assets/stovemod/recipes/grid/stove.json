@@ -29,7 +29,7 @@
       ]
     },
     "I": { "type": "item", "code": "game:metalplate-iron" },
-    "F": { "type": "item", "code": "game:burnedbrick-fire" }
+    "F": { "type": "item", "code": "game:burnedbrick-fire", "quantity": 2 }
   },
   "width": 3,
   "height": 3,
