@@ -37,7 +37,32 @@ namespace StoveMod
 
         public override ItemStack[] GetDrops(IWorldAccessor world, BlockPos pos, IPlayer byPlayer, float dropQuantityMultiplier = 1)
         {
-            return new ItemStack[] { new ItemStack(this) };
+            Block southVariant = GetSouthVariant(world);
+            return new ItemStack[] { new ItemStack(southVariant ?? this) };
+        }
+
+        public override ItemStack OnPickBlock(IWorldAccessor world, BlockPos pos)
+        {
+            Block southVariant = GetSouthVariant(world);
+            return new ItemStack(southVariant ?? this);
+        }
+
+        Block GetSouthVariant(IWorldAccessor world)
+        {
+            string path = Code?.Path;
+            if (string.IsNullOrEmpty(path)) return null;
+
+            string[] orientations = new[] { "-north", "-east", "-west" };
+            foreach (var orient in orientations)
+            {
+                if (path.EndsWith(orient))
+                {
+                    string southPath = path.Substring(0, path.Length - orient.Length) + "-south";
+                    return world.GetBlock(new AssetLocation(Code.Domain, southPath));
+                }
+            }
+
+            return this;
         }
 
         public EnumIgniteState OnTryIgniteBlock(EntityAgent byEntity, BlockPos pos, float secondsIgniting)

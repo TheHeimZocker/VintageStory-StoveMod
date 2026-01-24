@@ -75,9 +75,20 @@ namespace StoveMod
         public float CurrentTemperature => furnaceTemperature;
         public bool HasPot => HasCookingContainer;
 
+        const int MaxCookingSlotStackSize = 6;
+
         public BlockEntityStove()
         {
-            stoveInventory = new InventoryGeneric(7, null, null);
+            stoveInventory = new InventoryGeneric(7, null, null, null);
+            ConfigureSlots();
+        }
+
+        void ConfigureSlots()
+        {
+            for (int i = 3; i <= 6; i++)
+            {
+                stoveInventory[i].MaxSlotStackSize = MaxCookingSlotStackSize;
+            }
         }
 
         public override void Initialize(ICoreAPI api)
@@ -86,6 +97,8 @@ namespace StoveMod
             
             stoveInventory.LateInitialize(InventoryClassName + "-" + Pos, api);
             stoveInventory.SlotModified += OnSlotModified;
+            
+            SanitizeInventory();
             
             RegisterGameTickListener(OnBurnTick, 100);
             RegisterGameTickListener(On500msTick, 500);
@@ -721,41 +734,65 @@ namespace StoveMod
                 }
                 else
                 {
-                    if (!OutputSlot.Empty && (OutputSlot.Itemstack.Collectible is BlockCookingContainer ||
-                                               OutputSlot.Itemstack.Collectible is BlockCookedContainer ||
-                                               OutputSlot.Itemstack.Collectible is IInFirepitMeshSupplier))
+                    if (!OutputSlot.Empty)
                     {
-                        if (Api.Side == EnumAppSide.Client)
+                        if (!IsStackValid(OutputSlot.Itemstack))
                         {
-                            renderer?.ClearContents();
-                            customRenderer?.ClearAll();
-                        }
-                        
-                        if (byPlayer.InventoryManager.TryGiveItemstack(OutputSlot.Itemstack.Clone()))
-                        {
+                            Api?.Logger?.Warning("[Stove] Purged invalid itemstack from output slot at " + Pos + " during pickup");
                             OutputSlot.Itemstack = null;
                             OutputSlot.MarkDirty();
                             MarkDirty(true);
                             return true;
                         }
-                    }
-                    else if (!InputSlot.Empty && (InputSlot.Itemstack.Collectible is BlockCookingContainer ||
-                                              InputSlot.Itemstack.Collectible is BlockCookedContainer ||
-                                              InputSlot.Itemstack.Collectible is IInFirepitMeshSupplier))
-                    {
-                        if (Api.Side == EnumAppSide.Client)
-                        {
-                            renderer?.ClearContents();
-                            customRenderer?.ClearAll();
-                        }
                         
-                        DropCookingSlots();
-                        if (byPlayer.InventoryManager.TryGiveItemstack(InputSlot.Itemstack.Clone()))
+                        if (OutputSlot.Itemstack.Collectible is BlockCookingContainer ||
+                            OutputSlot.Itemstack.Collectible is BlockCookedContainer ||
+                            OutputSlot.Itemstack.Collectible is IInFirepitMeshSupplier)
                         {
+                            if (Api.Side == EnumAppSide.Client)
+                            {
+                                renderer?.ClearContents();
+                                customRenderer?.ClearAll();
+                            }
+                            
+                            if (byPlayer.InventoryManager.TryGiveItemstack(OutputSlot.Itemstack.Clone()))
+                            {
+                                OutputSlot.Itemstack = null;
+                                OutputSlot.MarkDirty();
+                                MarkDirty(true);
+                                return true;
+                            }
+                        }
+                    }
+                    else if (!InputSlot.Empty)
+                    {
+                        if (!IsStackValid(InputSlot.Itemstack))
+                        {
+                            Api?.Logger?.Warning("[Stove] Purged invalid itemstack from input slot at " + Pos + " during pickup");
                             InputSlot.Itemstack = null;
                             InputSlot.MarkDirty();
                             MarkDirty(true);
                             return true;
+                        }
+                        
+                        if (InputSlot.Itemstack.Collectible is BlockCookingContainer ||
+                            InputSlot.Itemstack.Collectible is BlockCookedContainer ||
+                            InputSlot.Itemstack.Collectible is IInFirepitMeshSupplier)
+                        {
+                            if (Api.Side == EnumAppSide.Client)
+                            {
+                                renderer?.ClearContents();
+                                customRenderer?.ClearAll();
+                            }
+                            
+                            DropCookingSlots();
+                            if (byPlayer.InventoryManager.TryGiveItemstack(InputSlot.Itemstack.Clone()))
+                            {
+                                InputSlot.Itemstack = null;
+                                InputSlot.MarkDirty();
+                                MarkDirty(true);
+                                return true;
+                            }
                         }
                     }
                 }
@@ -859,6 +896,11 @@ namespace StoveMod
             
             if (contentStack != null)
             {
+                if (contentStack.Collectible == null)
+                {
+                    return false;
+                }
+                
                 bool isCookingContainer = contentStack.Collectible is BlockCookingContainer || 
                                            contentStack.Collectible is BlockCookedContainer;
                 
@@ -889,7 +931,7 @@ namespace StoveMod
 
         private MeshData GetContentMesh(ItemStack contentStack, ITesselatorAPI tesselator)
         {
-            if (contentStack == null) return null;
+            if (contentStack == null || contentStack.Collectible == null) return null;
 
             if (contentStack.Collectible is IInFirepitMeshSupplier meshSupplier)
             {
@@ -1022,6 +1064,7 @@ namespace StoveMod
             if (stoveInventory == null)
             {
                 stoveInventory = new InventoryGeneric(7, null, null);
+                ConfigureSlots();
             }
             
             stoveInventory.FromTreeAttributes(tree.GetTreeAttribute("inventory"));
@@ -1030,6 +1073,7 @@ namespace StoveMod
             {
                 stoveInventory.Api = Api;
                 stoveInventory.ResolveBlocksOrItems();
+                SanitizeInventory();
             }
             
             if (Api?.Side == EnumAppSide.Client)
@@ -1126,7 +1170,10 @@ namespace StoveMod
                 ItemSlot slot = stoveInventory[i];
                 if (!slot.Empty)
                 {
-                    Api.World.SpawnItemEntity(slot.Itemstack, Pos.ToVec3d().Add(0.5, 0.5, 0.5));
+                    if (slot.Itemstack?.Collectible != null)
+                    {
+                        Api.World.SpawnItemEntity(slot.Itemstack, Pos.ToVec3d().Add(0.5, 0.5, 0.5));
+                    }
                     slot.Itemstack = null;
                     slot.MarkDirty();
                 }
@@ -1164,6 +1211,39 @@ namespace StoveMod
             renderer = null;
             customRenderer?.Dispose();
             customRenderer = null;
+        }
+
+        void SanitizeInventory()
+        {
+            if (stoveInventory == null) return;
+            
+            bool purgedAny = false;
+            
+            for (int i = 0; i < stoveInventory.Count; i++)
+            {
+                ItemSlot slot = stoveInventory[i];
+                if (slot?.Itemstack != null && !IsStackValid(slot.Itemstack))
+                {
+                    string code = slot.Itemstack.Collectible?.Code?.ToString() ?? "unknown";
+                    Api?.Logger?.Warning($"[Stove] Purged invalid itemstack from stove at {Pos} slot {i} (missing collectible: {code})");
+                    slot.Itemstack = null;
+                    slot.MarkDirty();
+                    purgedAny = true;
+                }
+            }
+            
+            if (purgedAny)
+            {
+                MarkDirty(true);
+            }
+        }
+
+        bool IsStackValid(ItemStack stack)
+        {
+            if (stack == null) return true;
+            if (stack.Collectible == null) return false;
+            if (stack.Collectible.Code == null) return false;
+            return true;
         }
 
         public float GetHeatStrength(IWorldAccessor world, BlockPos heatSourcePos, BlockPos heatReceiverPos)

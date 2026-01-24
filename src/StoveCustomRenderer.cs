@@ -58,6 +58,9 @@ namespace StoveMod
         {
             if (disposed) return;
 
+            if (inputStack != null && inputStack.Collectible == null) inputStack = null;
+            if (outputStack != null && outputStack.Collectible == null) outputStack = null;
+
             bool inputChanged = forceRefresh || !StacksEqual(inputStack, lastInputStack);
             bool outputChanged = forceRefresh || !StacksEqual(outputStack, lastOutputStack);
             
@@ -120,6 +123,11 @@ namespace StoveMod
             
             if (a.Collectible?.Code?.ToString() != b.Collectible?.Code?.ToString()) return false;
             if (a.StackSize != b.StackSize) return false;
+            
+            string attrA = a.Attributes?.ToJsonToken()?.ToString() ?? "";
+            string attrB = b.Attributes?.ToJsonToken()?.ToString() ?? "";
+            if (attrA != attrB) return false;
+
             
             return true;
         }

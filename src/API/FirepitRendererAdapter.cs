@@ -92,6 +92,7 @@ namespace StoveMod.API
 
             IStandardShaderProgram prog = rpi.PreparedStandardShader(pos.X, pos.Y, pos.Z);
             prog.Use();
+            prog.Tex2D = capi.BlockTextureAtlas.AtlasTextures[0].TextureId;
             prog.DontWarpVertices = 0;
             prog.AddRenderFlags = 0;
             prog.RgbaAmbientIn = rpi.AmbientColor;
@@ -138,6 +139,8 @@ namespace StoveMod.API
             }
 
             prog.Stop();
+            rpi.GlToggleBlend(false);
+            rpi.GlEnableCullFace();
         }
 
         void ResolveMeshFieldsViaReflection()
